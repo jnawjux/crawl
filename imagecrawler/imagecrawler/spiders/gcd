@@ -1,0 +1,32 @@
+import scrapy
+import re
+from scrapy.linkextractor import LinkExtractor
+from scrapy.selector import Selector
+
+class ComicScraper(scrapy.Spider):
+    name = "gcd"
+    
+    url_matcher = re.compile('https\/\/files1.comics.org\/\/img\/gcd\/covers_by_id\/')
+    
+    crawled_ids = set()
+
+    def start_requests(self):
+        url = "https://www.comics.org/"
+        yield scrapy.Request(url, self.parse)
+
+    def parse(self, response):
+        body = Selector(text=response.body)
+        link_extractor = LinkExtractor(allow=ComicScraper.url_matcher)
+        next_links = [link.url for link in link_extractor.extract_links(response) if not in self.is_extracted(link.url)]
+
+        # Crawl the filtered links
+        for link in next_links:
+            yield scrapy.Request(link, self.parse)
+            
+    def is_extracted(self, url):
+        # Image urls are of type: https://www.pexels.com/photo/asphalt-blur-clouds-dawn-392010/
+        id = int(url.split('/')[-2].split('-')[-1])
+        if id not in ComicScraper.crawled_ids:
+            ComicScraper.crawled_ids.add(id)
+            return False
+        return True
